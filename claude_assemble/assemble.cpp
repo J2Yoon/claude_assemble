@@ -4,6 +4,8 @@
 
 #include "build/CarBuilder.h"
 #include "domain/Car.h"
+#include "domain/CarTypeCatalog.h"
+#include "domain/PartCatalog.h"
 #include "rules/CompatibilityChecker.h"
 #include "rules/CompatibilityRules.h"
 #include "rules/ICompatibilityRule.h"
@@ -287,6 +289,57 @@ TEST(CarBuilderTest, BuildFailsWhenNothingIsSet)
     EXPECT_FALSE(builder.build().has_value());
 }
 
+// [Phase 3] Factory/Catalog: 부품 목록·이름 매핑이 한 곳(PartCatalog)에서 관리되는지 확인.
+TEST(PartCatalogTest, AvailableEnginesMatchSpec)
+{
+    const std::vector<Engine>& engines = PartCatalog::availableEngines();
+    ASSERT_EQ(engines.size(), 3u);
+    EXPECT_EQ(engines[0], Engine::Gm);
+    EXPECT_EQ(engines[1], Engine::Toyota);
+    EXPECT_EQ(engines[2], Engine::Wia);
+
+    EXPECT_EQ(PartCatalog::nameOf(Engine::Gm), "GM");
+    EXPECT_EQ(PartCatalog::nameOf(Engine::Toyota), "TOYOTA");
+    EXPECT_EQ(PartCatalog::nameOf(Engine::Wia), "WIA");
+}
+
+TEST(PartCatalogTest, AvailableBrakeSystemsMatchSpec)
+{
+    const std::vector<BrakeSystem>& brakes = PartCatalog::availableBrakeSystems();
+    ASSERT_EQ(brakes.size(), 3u);
+    EXPECT_EQ(brakes[0], BrakeSystem::Mando);
+    EXPECT_EQ(brakes[1], BrakeSystem::Continental);
+    EXPECT_EQ(brakes[2], BrakeSystem::Bosch);
+
+    EXPECT_EQ(PartCatalog::nameOf(BrakeSystem::Mando), "MANDO");
+    EXPECT_EQ(PartCatalog::nameOf(BrakeSystem::Continental), "CONTINENTAL");
+    EXPECT_EQ(PartCatalog::nameOf(BrakeSystem::Bosch), "BOSCH");
+}
+
+TEST(PartCatalogTest, AvailableSteeringSystemsMatchSpec)
+{
+    const std::vector<SteeringSystem>& steerings = PartCatalog::availableSteeringSystems();
+    ASSERT_EQ(steerings.size(), 2u);
+    EXPECT_EQ(steerings[0], SteeringSystem::Bosch);
+    EXPECT_EQ(steerings[1], SteeringSystem::Mobis);
+
+    EXPECT_EQ(PartCatalog::nameOf(SteeringSystem::Bosch), "BOSCH");
+    EXPECT_EQ(PartCatalog::nameOf(SteeringSystem::Mobis), "MOBIS");
+}
+
+TEST(CarTypeCatalogTest, AvailableCarTypesMatchSpec)
+{
+    const std::vector<CarType>& carTypes = CarTypeCatalog::availableCarTypes();
+    ASSERT_EQ(carTypes.size(), 3u);
+    EXPECT_EQ(carTypes[0], CarType::Sedan);
+    EXPECT_EQ(carTypes[1], CarType::Suv);
+    EXPECT_EQ(carTypes[2], CarType::Truck);
+
+    EXPECT_EQ(CarTypeCatalog::nameOf(CarType::Sedan), "Sedan");
+    EXPECT_EQ(CarTypeCatalog::nameOf(CarType::Suv), "SUV");
+    EXPECT_EQ(CarTypeCatalog::nameOf(CarType::Truck), "Truck");
+}
+
 int main()
 {
     testing::InitGoogleMock();
@@ -298,6 +351,9 @@ int main()
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#include "domain/CarTypeCatalog.h"
+#include "domain/PartCatalog.h"
 
 #define CLEAR_SCREEN "\033[H\033[2J"
 
@@ -381,18 +437,26 @@ int main()
             printf(" '-(@)----------------(@)--'\n");
             printf("===============================\n");
             printf("어떤 차량 타입을 선택할까요?\n");
-            printf("1. Sedan\n");
-            printf("2. SUV\n");
-            printf("3. Truck\n");
+            {
+                const auto& carTypes = CarTypeCatalog::availableCarTypes();
+                for (size_t i = 0; i < carTypes.size(); i++)
+                {
+                    printf("%zu. %s\n", i + 1, CarTypeCatalog::nameOf(carTypes[i]).c_str());
+                }
+            }
         }
         else if (step == Engine_Q)
         {
             printf(CLEAR_SCREEN);
             printf("어떤 엔진을 탑재할까요?\n");
             printf("0. 뒤로가기\n");
-            printf("1. GM\n");
-            printf("2. TOYOTA\n");
-            printf("3. WIA\n");
+            {
+                const auto& engines = PartCatalog::availableEngines();
+                for (size_t i = 0; i < engines.size(); i++)
+                {
+                    printf("%zu. %s\n", i + 1, PartCatalog::nameOf(engines[i]).c_str());
+                }
+            }
             printf("4. 고장난 엔진\n");
         }
         else if (step == brakeSystem_Q)
@@ -400,17 +464,26 @@ int main()
             printf(CLEAR_SCREEN);
             printf("어떤 제동장치를 선택할까요?\n");
             printf("0. 뒤로가기\n");
-            printf("1. MANDO\n");
-            printf("2. CONTINENTAL\n");
-            printf("3. BOSCH\n");
+            {
+                const auto& brakes = PartCatalog::availableBrakeSystems();
+                for (size_t i = 0; i < brakes.size(); i++)
+                {
+                    printf("%zu. %s\n", i + 1, PartCatalog::nameOf(brakes[i]).c_str());
+                }
+            }
         }
         else if (step == SteeringSystem_Q)
         {
             printf(CLEAR_SCREEN);
             printf("어떤 조향장치를 선택할까요?\n");
             printf("0. 뒤로가기\n");
-            printf("1. BOSCH\n");
-            printf("2. MOBIS\n");
+            {
+                const auto& steerings = PartCatalog::availableSteeringSystems();
+                for (size_t i = 0; i < steerings.size(); i++)
+                {
+                    printf("%zu. %s\n", i + 1, PartCatalog::nameOf(steerings[i]).c_str());
+                }
+            }
         }
         else if (step == Run_Test)
         {
@@ -540,43 +613,37 @@ int main()
 void selectCarType(int answer)
 {
     stack[CarType_Q] = answer;
-    if (answer == 1)
-        printf("차량 타입으로 Sedan을 선택하셨습니다.\n");
-    if (answer == 2)
-        printf("차량 타입으로 SUV을 선택하셨습니다.\n");
-    if (answer == 3)
-        printf("차량 타입으로 Truck을 선택하셨습니다.\n");
+    if (answer >= 1 && answer <= 3)
+    {
+        printf("차량 타입으로 %s을 선택하셨습니다.\n", CarTypeCatalog::nameOf(static_cast<CarType>(answer)).c_str());
+    }
 }
 
 void selectEngine(int answer)
 {
     stack[Engine_Q] = answer;
-    if (answer == 1)
-        printf("GM 엔진을 선택하셨습니다.\n");
-    if (answer == 2)
-        printf("TOYOTA 엔진을 선택하셨습니다.\n");
-    if (answer == 3)
-        printf("WIA 엔진을 선택하셨습니다.\n");
+    if (answer >= 1 && answer <= 3)
+    {
+        printf("%s 엔진을 선택하셨습니다.\n", PartCatalog::nameOf(static_cast<Engine>(answer)).c_str());
+    }
 }
 
 void selectbrakeSystem(int answer)
 {
     stack[brakeSystem_Q] = answer;
-    if (answer == 1)
-        printf("MANDO 제동장치를 선택하셨습니다.\n");
-    if (answer == 2)
-        printf("CONTINENTAL 제동장치를 선택하셨습니다.\n");
-    if (answer == 3)
-        printf("BOSCH 제동장치를 선택하셨습니다.\n");
+    if (answer >= 1 && answer <= 3)
+    {
+        printf("%s 제동장치를 선택하셨습니다.\n", PartCatalog::nameOf(static_cast<BrakeSystem>(answer)).c_str());
+    }
 }
 
 void selectSteeringSystem(int answer)
 {
     stack[SteeringSystem_Q] = answer;
-    if (answer == 1)
-        printf("BOSCH 조향장치를 선택하셨습니다.\n");
-    if (answer == 2)
-        printf("MOBIS 조향장치를 선택하셨습니다.\n");
+    if (answer >= 1 && answer <= 2)
+    {
+        printf("%s 조향장치를 선택하셨습니다.\n", PartCatalog::nameOf(static_cast<SteeringSystem>(answer)).c_str());
+    }
 }
 
 int isValidCheck()
