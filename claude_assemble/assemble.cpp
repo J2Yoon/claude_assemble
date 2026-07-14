@@ -103,6 +103,58 @@ TEST(AssembleSpecTest, ValidCombinationsPerCarType)
     EXPECT_TRUE(isValidCombination(TRUCK, GM, BOSCH_B, BOSCH_S));
 }
 
+// [Phase 0] 하나의 조합이 여러 제한조건을 동시에 위반해도 무효로 판정되는지 확인
+TEST(AssembleSpecTest, MultipleRuleViolationsStillInvalid)
+{
+    // 제한조건 2-3(Truck+WIA) & 2-4(Truck+Mando) 동시 위반
+    EXPECT_FALSE(isValidCombination(TRUCK, WIA, MANDO, BOSCH_S));
+    // 제한조건 2-4(Truck+Mando) & 1(Bosch 브레이크 아님이므로 미해당) -> 2-4만 해당하지만
+    // 제한조건 1(Bosch 브레이크) & 2-1(Sedan+Continental)은 브레이크가 다르므로 동시 발생 불가능함을
+    // 문서화하는 차원에서, Bosch 브레이크 + Sedan 조합이 제한조건 1만으로 무효 처리되는지 확인
+    EXPECT_FALSE(isValidCombination(SEDAN, GM, BOSCH_B, MOBIS));
+    // 제한조건 2-2(SUV+TOYOTA) & 1(Bosch 브레이크 + Bosch 아닌 조향) 동시 위반
+    EXPECT_FALSE(isValidCombination(SUV, TOYOTA, BOSCH_B, MOBIS));
+}
+
+// [Phase 0] CarType(3) x Engine(3) x BrakeSystem(3) x SteeringSystem(2) = 54가지 전체 조합에 대해
+// spec.md 제한조건 1·2를 그대로 적용한 기대값과 isValidCombination() 결과를 전수 비교한다.
+// Phase 1 이후 검증 로직을 Chain of Responsibility로 옮길 때 동작이 1건이라도 달라지면 즉시 실패한다.
+TEST(AssembleSpecTest, ExhaustiveCombinationMatrix)
+{
+    const int carTypes[] = { SEDAN, SUV, TRUCK };
+    const int engines[] = { GM, TOYOTA, WIA };
+    const int brakes[] = { MANDO, CONTINENTAL, BOSCH_B };
+    const int steerings[] = { BOSCH_S, MOBIS };
+
+    for (int carType : carTypes)
+    {
+        for (int engine : engines)
+        {
+            for (int brake : brakes)
+            {
+                for (int steering : steerings)
+                {
+                    bool expected = true;
+                    if (carType == SEDAN && brake == CONTINENTAL)
+                        expected = false;
+                    else if (carType == SUV && engine == TOYOTA)
+                        expected = false;
+                    else if (carType == TRUCK && engine == WIA)
+                        expected = false;
+                    else if (carType == TRUCK && brake == MANDO)
+                        expected = false;
+                    else if (brake == BOSCH_B && steering != BOSCH_S)
+                        expected = false;
+
+                    EXPECT_EQ(isValidCombination(carType, engine, brake, steering), expected)
+                        << "carType=" << carType << " engine=" << engine
+                        << " brake=" << brake << " steering=" << steering;
+                }
+            }
+        }
+    }
+}
+
 int main()
 {
     testing::InitGoogleMock();
