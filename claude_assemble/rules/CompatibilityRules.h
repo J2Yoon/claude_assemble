@@ -2,21 +2,13 @@
 
 #include "ICompatibilityRule.h"
 
-// 값은 docs/spec.md 매핑을 그대로 사용한다 (레거시 enum과 동일한 정수값).
-// CarType: SEDAN=1, SUV=2, TRUCK=3
-// Engine: GM=1, TOYOTA=2, WIA=3
-// BrakeSystem: MANDO=1, CONTINENTAL=2, BOSCH=3
-// SteeringSystem: BOSCH=1, MOBIS=2
-//
-// Phase 3에서 PartCatalog가 도입되면 이 매직넘버들은 카탈로그 상수로 대체될 예정이다.
-
 // 제한조건 1: 제동장치에 Bosch를 사용했다면, 조향장치도 Bosch를 사용해야 한다.
 class BoschBrakeRequiresBoschSteeringRule : public ICompatibilityRule
 {
 public:
-    std::optional<std::string> check(const PartSelection& selection) const override
+    std::optional<std::string> check(const Car& car) const override
     {
-        if (selection.brakeSystem == 3 && selection.steeringSystem != 1)
+        if (car.brake == BrakeSystem::Bosch && car.steering != SteeringSystem::Bosch)
         {
             return "Bosch제동장치에는 Bosch조향장치 이외 사용 불가";
         }
@@ -28,9 +20,9 @@ public:
 class SedanCannotUseContinentalBrakeRule : public ICompatibilityRule
 {
 public:
-    std::optional<std::string> check(const PartSelection& selection) const override
+    std::optional<std::string> check(const Car& car) const override
     {
-        if (selection.carType == 1 && selection.brakeSystem == 2)
+        if (car.type == CarType::Sedan && car.brake == BrakeSystem::Continental)
         {
             return "Sedan에는 Continental제동장치 사용 불가";
         }
@@ -42,9 +34,9 @@ public:
 class SuvCannotUseToyotaEngineRule : public ICompatibilityRule
 {
 public:
-    std::optional<std::string> check(const PartSelection& selection) const override
+    std::optional<std::string> check(const Car& car) const override
     {
-        if (selection.carType == 2 && selection.engine == 2)
+        if (car.type == CarType::Suv && car.engine == Engine::Toyota)
         {
             return "SUV에는 TOYOTA엔진 사용 불가";
         }
@@ -56,9 +48,9 @@ public:
 class TruckCannotUseWiaEngineRule : public ICompatibilityRule
 {
 public:
-    std::optional<std::string> check(const PartSelection& selection) const override
+    std::optional<std::string> check(const Car& car) const override
     {
-        if (selection.carType == 3 && selection.engine == 3)
+        if (car.type == CarType::Truck && car.engine == Engine::Wia)
         {
             return "Truck에는 WIA엔진 사용 불가";
         }
@@ -70,9 +62,9 @@ public:
 class TruckCannotUseMandoBrakeRule : public ICompatibilityRule
 {
 public:
-    std::optional<std::string> check(const PartSelection& selection) const override
+    std::optional<std::string> check(const Car& car) const override
     {
-        if (selection.carType == 3 && selection.brakeSystem == 1)
+        if (car.type == CarType::Truck && car.brake == BrakeSystem::Mando)
         {
             return "Truck에는 Mando제동장치 사용 불가";
         }

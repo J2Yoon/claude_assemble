@@ -29,6 +29,12 @@
     <ClInclude Include="rules\CompatibilityChecker.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="domain\Car.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="build\CarBuilder.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
