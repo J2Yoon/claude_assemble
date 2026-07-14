@@ -2,6 +2,8 @@
 
 #include "gmock/gmock.h"
 
+#include "build/CarBuilder.h"
+#include "domain/Car.h"
 #include "rules/CompatibilityChecker.h"
 #include "rules/CompatibilityRules.h"
 #include "rules/ICompatibilityRule.h"
@@ -161,45 +163,47 @@ TEST(AssembleSpecTest, ExhaustiveCombinationMatrix)
 
 // [Phase 1] Chain of Responsibility로 추출한 CompatibilityChecker 기준 테스트.
 // 레거시 isValidCombination() 기준선(위 AssembleSpecTest)은 회귀 확인용으로 그대로 유지한다.
+// [Phase 2] CompatibilityChecker/ICompatibilityRule이 PartSelection(int 4개) 대신
+// Car(enum class 기반 값 타입)를 입력받도록 시그니처가 바뀌어, 아래 테스트도 Car 리터럴을 사용한다.
 
 // 제한조건 1: 제동장치에 Bosch를 사용했다면, 조향장치도 Bosch를 사용해야 한다.
 TEST(CompatibilityCheckerTest, BoschBrakeRequiresBoschSteeringRule)
 {
     BoschBrakeRequiresBoschSteeringRule rule;
-    EXPECT_TRUE(rule.check({ SEDAN, GM, BOSCH_B, MOBIS }).has_value());
-    EXPECT_FALSE(rule.check({ SEDAN, GM, BOSCH_B, BOSCH_S }).has_value());
+    EXPECT_TRUE(rule.check(Car{ CarType::Sedan, Engine::Gm, BrakeSystem::Bosch, SteeringSystem::Mobis }).has_value());
+    EXPECT_FALSE(rule.check(Car{ CarType::Sedan, Engine::Gm, BrakeSystem::Bosch, SteeringSystem::Bosch }).has_value());
 }
 
 // 제한조건 2-1: Continental은 Sedan용 제동장치를 만들지 않는다.
 TEST(CompatibilityCheckerTest, SedanCannotUseContinentalBrakeRule)
 {
     SedanCannotUseContinentalBrakeRule rule;
-    EXPECT_TRUE(rule.check({ SEDAN, GM, CONTINENTAL, BOSCH_S }).has_value());
-    EXPECT_FALSE(rule.check({ SUV, GM, CONTINENTAL, BOSCH_S }).has_value());
+    EXPECT_TRUE(rule.check(Car{ CarType::Sedan, Engine::Gm, BrakeSystem::Continental, SteeringSystem::Bosch }).has_value());
+    EXPECT_FALSE(rule.check(Car{ CarType::Suv, Engine::Gm, BrakeSystem::Continental, SteeringSystem::Bosch }).has_value());
 }
 
 // 제한조건 2-2: TOYOTA는 SUV용 엔진을 만들지 않는다.
 TEST(CompatibilityCheckerTest, SuvCannotUseToyotaEngineRule)
 {
     SuvCannotUseToyotaEngineRule rule;
-    EXPECT_TRUE(rule.check({ SUV, TOYOTA, MANDO, BOSCH_S }).has_value());
-    EXPECT_FALSE(rule.check({ SEDAN, TOYOTA, MANDO, BOSCH_S }).has_value());
+    EXPECT_TRUE(rule.check(Car{ CarType::Suv, Engine::Toyota, BrakeSystem::Mando, SteeringSystem::Bosch }).has_value());
+    EXPECT_FALSE(rule.check(Car{ CarType::Sedan, Engine::Toyota, BrakeSystem::Mando, SteeringSystem::Bosch }).has_value());
 }
 
 // 제한조건 2-3: WIA는 Truck용 엔진을 만들지 않는다.
 TEST(CompatibilityCheckerTest, TruckCannotUseWiaEngineRule)
 {
     TruckCannotUseWiaEngineRule rule;
-    EXPECT_TRUE(rule.check({ TRUCK, WIA, MANDO, BOSCH_S }).has_value());
-    EXPECT_FALSE(rule.check({ SEDAN, WIA, MANDO, BOSCH_S }).has_value());
+    EXPECT_TRUE(rule.check(Car{ CarType::Truck, Engine::Wia, BrakeSystem::Mando, SteeringSystem::Bosch }).has_value());
+    EXPECT_FALSE(rule.check(Car{ CarType::Sedan, Engine::Wia, BrakeSystem::Mando, SteeringSystem::Bosch }).has_value());
 }
 
 // 제한조건 2-4: Mando는 Truck용 제동장치를 만들지 않는다.
 TEST(CompatibilityCheckerTest, TruckCannotUseMandoBrakeRule)
 {
     TruckCannotUseMandoBrakeRule rule;
-    EXPECT_TRUE(rule.check({ TRUCK, GM, MANDO, BOSCH_S }).has_value());
-    EXPECT_FALSE(rule.check({ SUV, GM, MANDO, BOSCH_S }).has_value());
+    EXPECT_TRUE(rule.check(Car{ CarType::Truck, Engine::Gm, BrakeSystem::Mando, SteeringSystem::Bosch }).has_value());
+    EXPECT_FALSE(rule.check(Car{ CarType::Suv, Engine::Gm, BrakeSystem::Mando, SteeringSystem::Bosch }).has_value());
 }
 
 // 하나의 조합이 여러 규칙을 동시에 위반하면 위반 사유가 모두 수집되는지 확인
@@ -208,11 +212,11 @@ TEST(CompatibilityCheckerTest, MultipleRuleViolationsReturnsAllReasons)
     CompatibilityChecker checker = makeDefaultCompatibilityChecker();
 
     // TRUCK + WIA + MANDO -> 제한조건 2-3, 2-4 동시 위반
-    std::vector<std::string> reasons = checker.validate({ TRUCK, WIA, MANDO, BOSCH_S });
+    std::vector<std::string> reasons = checker.validate(Car{ CarType::Truck, Engine::Wia, BrakeSystem::Mando, SteeringSystem::Bosch });
     EXPECT_EQ(reasons.size(), 2u);
 
     // 위반 없는 조합은 빈 벡터
-    EXPECT_TRUE(checker.validate({ SEDAN, GM, MANDO, BOSCH_S }).empty());
+    EXPECT_TRUE(checker.validate(Car{ CarType::Sedan, Engine::Gm, BrakeSystem::Mando, SteeringSystem::Bosch }).empty());
 }
 
 // CarType(3) x Engine(3) x BrakeSystem(3) x SteeringSystem(2) = 54가지 전체 조합에 대해
@@ -235,7 +239,10 @@ TEST(CompatibilityCheckerTest, ExhaustiveCrossCheckWithLegacy)
                 for (int steering : steerings)
                 {
                     bool legacyValid = isValidCombination(carType, engine, brake, steering);
-                    bool checkerValid = checker.validate({ carType, engine, brake, steering }).empty();
+
+                    Car car{ static_cast<CarType>(carType), static_cast<Engine>(engine),
+                             static_cast<BrakeSystem>(brake), static_cast<SteeringSystem>(steering) };
+                    bool checkerValid = checker.validate(car).empty();
 
                     EXPECT_EQ(checkerValid, legacyValid)
                         << "carType=" << carType << " engine=" << engine
@@ -244,6 +251,40 @@ TEST(CompatibilityCheckerTest, ExhaustiveCrossCheckWithLegacy)
             }
         }
     }
+}
+
+// [Phase 2] Builder 패턴: std::optional 기반으로 "미조립 상태"를 표현하는 CarBuilder 테스트.
+TEST(CarBuilderTest, BuildSucceedsWhenAllPartsAreSet)
+{
+    CarBuilder builder;
+    builder.setCarType(CarType::Sedan)
+        .setEngine(Engine::Gm)
+        .setBrakeSystem(BrakeSystem::Mando)
+        .setSteeringSystem(SteeringSystem::Bosch);
+
+    std::optional<Car> car = builder.build();
+    ASSERT_TRUE(car.has_value());
+    EXPECT_EQ(car->type, CarType::Sedan);
+    EXPECT_EQ(car->engine, Engine::Gm);
+    EXPECT_EQ(car->brake, BrakeSystem::Mando);
+    EXPECT_EQ(car->steering, SteeringSystem::Bosch);
+}
+
+TEST(CarBuilderTest, BuildFailsWhenAnyPartIsMissing)
+{
+    CarBuilder builder;
+    builder.setCarType(CarType::Suv)
+        .setEngine(Engine::Gm)
+        .setBrakeSystem(BrakeSystem::Continental);
+    // SteeringSystem을 설정하지 않음
+
+    EXPECT_FALSE(builder.build().has_value());
+}
+
+TEST(CarBuilderTest, BuildFailsWhenNothingIsSet)
+{
+    CarBuilder builder;
+    EXPECT_FALSE(builder.build().has_value());
 }
 
 int main()

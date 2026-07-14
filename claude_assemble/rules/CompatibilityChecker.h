@@ -15,12 +15,12 @@ public:
         rules_.push_back(std::move(rule));
     }
 
-    std::vector<std::string> validate(const PartSelection& selection) const
+    std::vector<std::string> validate(const Car& car) const
     {
         std::vector<std::string> reasons;
         for (const auto& rule : rules_)
         {
-            if (auto reason = rule->check(selection))
+            if (auto reason = rule->check(car))
             {
                 reasons.push_back(*reason);
             }

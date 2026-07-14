@@ -145,6 +145,8 @@
     <ClInclude Include="rules\ICompatibilityRule.h" />
     <ClInclude Include="rules\CompatibilityRules.h" />
     <ClInclude Include="rules\CompatibilityChecker.h" />
+    <ClInclude Include="domain\Car.h" />
+    <ClInclude Include="build\CarBuilder.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
