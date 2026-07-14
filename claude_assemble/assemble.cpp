@@ -2,6 +2,10 @@
 
 #include "gmock/gmock.h"
 
+#include "rules/CompatibilityChecker.h"
+#include "rules/CompatibilityRules.h"
+#include "rules/ICompatibilityRule.h"
+
 // docs/spec.md 기준 자동차 조립 규칙 테스트용 (release 빌드의 isValidCheck 로직을 복제)
 enum CarType_Test
 {
@@ -147,6 +151,93 @@ TEST(AssembleSpecTest, ExhaustiveCombinationMatrix)
                         expected = false;
 
                     EXPECT_EQ(isValidCombination(carType, engine, brake, steering), expected)
+                        << "carType=" << carType << " engine=" << engine
+                        << " brake=" << brake << " steering=" << steering;
+                }
+            }
+        }
+    }
+}
+
+// [Phase 1] Chain of Responsibility로 추출한 CompatibilityChecker 기준 테스트.
+// 레거시 isValidCombination() 기준선(위 AssembleSpecTest)은 회귀 확인용으로 그대로 유지한다.
+
+// 제한조건 1: 제동장치에 Bosch를 사용했다면, 조향장치도 Bosch를 사용해야 한다.
+TEST(CompatibilityCheckerTest, BoschBrakeRequiresBoschSteeringRule)
+{
+    BoschBrakeRequiresBoschSteeringRule rule;
+    EXPECT_TRUE(rule.check({ SEDAN, GM, BOSCH_B, MOBIS }).has_value());
+    EXPECT_FALSE(rule.check({ SEDAN, GM, BOSCH_B, BOSCH_S }).has_value());
+}
+
+// 제한조건 2-1: Continental은 Sedan용 제동장치를 만들지 않는다.
+TEST(CompatibilityCheckerTest, SedanCannotUseContinentalBrakeRule)
+{
+    SedanCannotUseContinentalBrakeRule rule;
+    EXPECT_TRUE(rule.check({ SEDAN, GM, CONTINENTAL, BOSCH_S }).has_value());
+    EXPECT_FALSE(rule.check({ SUV, GM, CONTINENTAL, BOSCH_S }).has_value());
+}
+
+// 제한조건 2-2: TOYOTA는 SUV용 엔진을 만들지 않는다.
+TEST(CompatibilityCheckerTest, SuvCannotUseToyotaEngineRule)
+{
+    SuvCannotUseToyotaEngineRule rule;
+    EXPECT_TRUE(rule.check({ SUV, TOYOTA, MANDO, BOSCH_S }).has_value());
+    EXPECT_FALSE(rule.check({ SEDAN, TOYOTA, MANDO, BOSCH_S }).has_value());
+}
+
+// 제한조건 2-3: WIA는 Truck용 엔진을 만들지 않는다.
+TEST(CompatibilityCheckerTest, TruckCannotUseWiaEngineRule)
+{
+    TruckCannotUseWiaEngineRule rule;
+    EXPECT_TRUE(rule.check({ TRUCK, WIA, MANDO, BOSCH_S }).has_value());
+    EXPECT_FALSE(rule.check({ SEDAN, WIA, MANDO, BOSCH_S }).has_value());
+}
+
+// 제한조건 2-4: Mando는 Truck용 제동장치를 만들지 않는다.
+TEST(CompatibilityCheckerTest, TruckCannotUseMandoBrakeRule)
+{
+    TruckCannotUseMandoBrakeRule rule;
+    EXPECT_TRUE(rule.check({ TRUCK, GM, MANDO, BOSCH_S }).has_value());
+    EXPECT_FALSE(rule.check({ SUV, GM, MANDO, BOSCH_S }).has_value());
+}
+
+// 하나의 조합이 여러 규칙을 동시에 위반하면 위반 사유가 모두 수집되는지 확인
+TEST(CompatibilityCheckerTest, MultipleRuleViolationsReturnsAllReasons)
+{
+    CompatibilityChecker checker = makeDefaultCompatibilityChecker();
+
+    // TRUCK + WIA + MANDO -> 제한조건 2-3, 2-4 동시 위반
+    std::vector<std::string> reasons = checker.validate({ TRUCK, WIA, MANDO, BOSCH_S });
+    EXPECT_EQ(reasons.size(), 2u);
+
+    // 위반 없는 조합은 빈 벡터
+    EXPECT_TRUE(checker.validate({ SEDAN, GM, MANDO, BOSCH_S }).empty());
+}
+
+// CarType(3) x Engine(3) x BrakeSystem(3) x SteeringSystem(2) = 54가지 전체 조합에 대해
+// 레거시 isValidCombination()과 신규 CompatibilityChecker::validate()가 동일한 결과를 내는지 교차 검증한다.
+TEST(CompatibilityCheckerTest, ExhaustiveCrossCheckWithLegacy)
+{
+    CompatibilityChecker checker = makeDefaultCompatibilityChecker();
+
+    const int carTypes[] = { SEDAN, SUV, TRUCK };
+    const int engines[] = { GM, TOYOTA, WIA };
+    const int brakes[] = { MANDO, CONTINENTAL, BOSCH_B };
+    const int steerings[] = { BOSCH_S, MOBIS };
+
+    for (int carType : carTypes)
+    {
+        for (int engine : engines)
+        {
+            for (int brake : brakes)
+            {
+                for (int steering : steerings)
+                {
+                    bool legacyValid = isValidCombination(carType, engine, brake, steering);
+                    bool checkerValid = checker.validate({ carType, engine, brake, steering }).empty();
+
+                    EXPECT_EQ(checkerValid, legacyValid)
                         << "carType=" << carType << " engine=" << engine
                         << " brake=" << brake << " steering=" << steering;
                 }
