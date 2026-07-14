@@ -1,0 +1,16 @@
+# Visual Studio
+.vs/
+*.user
+x64/
+Win32/
+Debug/
+Release/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.log
+*.tlog
+*.idb
+*.iobj
+*.ipdb
