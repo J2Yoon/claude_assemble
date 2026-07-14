@@ -142,6 +142,11 @@
     <ClCompile Include="assemble.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="rules\ICompatibilityRule.h" />
+    <ClInclude Include="rules\CompatibilityRules.h" />
+    <ClInclude Include="rules\CompatibilityChecker.h" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
